@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "mcp-practical": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["./build/index.js"]
+    }
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash",
+            "args": [".claude/hooks/rebuild.sh"],
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
