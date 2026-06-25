@@ -33,7 +33,8 @@ export class BitbucketClient {
     const url = `${this.baseUrl}/src/${this.branch}/${filePath}`;
     const res = await fetch(url, { headers: { Authorization: this.authHeader } });
     if (!res.ok) {
-      throw new Error(`Bitbucket ${res.status} fetching file: ${filePath}`);
+      const body = await res.text();
+      throw new Error(`Bitbucket ${res.status} fetching file: ${filePath} — ${body}`);
     }
     return res.text();
   }
@@ -48,7 +49,8 @@ export class BitbucketClient {
         headers: { Authorization: this.authHeader, Accept: 'application/json' },
       });
       if (!res.ok) {
-        throw new Error(`Bitbucket ${res.status} listing directory: ${pathSegment || '(root)'}`);
+        const body = await res.text();
+        throw new Error(`Bitbucket ${res.status} listing directory: ${pathSegment || '(root)'} — ${body}`);
       }
 
       const data = (await res.json()) as DirListing;
