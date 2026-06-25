@@ -1,5 +1,7 @@
 node_modules/
 build/
+kb-index/
+kb-index-test/
 .claude/settings.local.json
 *.env
 .env*
