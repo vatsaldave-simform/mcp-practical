@@ -10,10 +10,14 @@ export interface KbConfig {
   google: {
     apiKey: string;
   };
-  index: {
-    dir: string;
+  qdrant: {
+    url: string;
+    apiKey: string;
+    collection: string;
+  };
+  search: {
     chunkMaxChars: number;
-    searchTopK: number;
+    topK: number;
   };
 }
 
@@ -48,10 +52,14 @@ export function getConfig(): KbConfig {
     google: {
       apiKey: require('GOOGLE_AI_API_KEY'),
     },
-    index: {
-      dir: optional('KB_INDEX_DIR', './kb-index'),
+    qdrant: {
+      url: require('QDRANT_URL'),
+      apiKey: require('QDRANT_API_KEY'),
+      collection: optional('QDRANT_COLLECTION', 'dd-brain-book'),
+    },
+    search: {
       chunkMaxChars: optionalInt('KB_CHUNK_MAX_CHARS', 1500),
-      searchTopK: optionalInt('KB_SEARCH_TOP_K', 5),
+      topK: optionalInt('KB_SEARCH_TOP_K', 5),
     },
   };
 }

@@ -1,15 +1,5 @@
-import { mkdir } from 'fs/promises';
-import { LocalIndex } from 'vectra';
-import type { MetadataFilter, MetadataTypes } from 'vectra';
-import type { Chunk } from './chunker.js';
-
-interface ChunkMeta {
-  filePath: string;
-  headingTrailJson: string;
-  text: string;
-  syncedAt: string;
-  [key: string]: MetadataTypes;
-}
+import { QdrantClient } from "@qdrant/js-client-rest";
+import type { Chunk } from "./chunker.js";
 
 export interface SearchResult {
   filePath: string;
@@ -19,73 +9,103 @@ export interface SearchResult {
   syncedAt: string;
 }
 
-export class VectorStore {
-  private index: LocalIndex<ChunkMeta>;
-  private updating = false;
+const VECTOR_SIZE = 768;
 
-  constructor(indexDir: string) {
-    this.index = new LocalIndex<ChunkMeta>(indexDir);
+export class VectorStore {
+  private client: QdrantClient;
+  private collection: string;
+
+  constructor(url: string, apiKey: string, collection: string) {
+    this.client = new QdrantClient({ url, apiKey });
+    this.collection = collection;
   }
 
   async init(): Promise<void> {
-    await mkdir(this.index.folderPath, { recursive: true });
-    if (!(await this.index.isIndexCreated())) {
-      await this.index.createIndex({ version: 1 });
-    }
-  }
-
-  async upsertFile(filePath: string, chunks: Chunk[], vectors: number[][]): Promise<void> {
-    if (this.updating) throw new Error('A sync is already in progress');
-    this.updating = true;
     try {
-      const staleItems = await this.index.listItemsByMetadata({ filePath: { $eq: filePath } });
-      await this.index.beginUpdate();
-      try {
-        for (const item of staleItems) {
-          await this.index.deleteItem(item.id);
-        }
-        const syncedAt = new Date().toISOString();
-        for (let i = 0; i < chunks.length; i++) {
-          await this.index.insertItem({
-            vector: vectors[i],
-            metadata: {
-              filePath: chunks[i].filePath,
-              headingTrailJson: JSON.stringify(chunks[i].headingTrail),
-              text: chunks[i].text,
-              syncedAt,
-            },
-          });
-        }
-        await this.index.endUpdate();
-      } catch (err) {
-        this.index.cancelUpdate();
-        throw err;
-      }
-    } finally {
-      this.updating = false;
+      await this.client.getCollection(this.collection);
+    } catch {
+      await this.client.createCollection(this.collection, {
+        vectors: { size: VECTOR_SIZE, distance: "Cosine" },
+      });
     }
   }
 
-  async query(vector: number[], topK: number, filterFilePath?: string): Promise<SearchResult[]> {
-    const filter: MetadataFilter | undefined = filterFilePath
-      ? { filePath: { $eq: filterFilePath } }
+  async upsertFile(
+    filePath: string,
+    chunks: Chunk[],
+    vectors: number[][],
+  ): Promise<void> {
+    await this.client.delete(this.collection, {
+      filter: { must: [{ key: "filePath", match: { value: filePath } }] },
+    });
+
+    if (chunks.length === 0) return;
+
+    const syncedAt = new Date().toISOString();
+    await this.client.upsert(this.collection, {
+      points: chunks.map((chunk, i) => ({
+        id: crypto.randomUUID(),
+        vector: vectors[i],
+        payload: {
+          filePath: chunk.filePath,
+          headingTrailJson: JSON.stringify(chunk.headingTrail),
+          text: chunk.text,
+          syncedAt,
+        },
+      })),
+    });
+  }
+
+  async query(
+    vector: number[],
+    topK: number,
+    filterFilePath?: string,
+  ): Promise<SearchResult[]> {
+    const filter = filterFilePath
+      ? { must: [{ key: "filePath", match: { value: filterFilePath } }] }
       : undefined;
-    const results = await this.index.queryItems<ChunkMeta>(vector, '', topK, filter);
-    return results.map(r => ({
-      filePath: r.item.metadata.filePath,
-      headingTrail: JSON.parse(r.item.metadata.headingTrailJson) as string[],
-      text: r.item.metadata.text,
+
+    const results = await this.client.search(this.collection, {
+      vector,
+      limit: topK,
+      filter,
+      with_payload: true,
+    });
+
+    return results.map((r) => ({
+      filePath: r.payload!.filePath as string,
+      headingTrail: JSON.parse(
+        r.payload!.headingTrailJson as string,
+      ) as string[],
+      text: r.payload!.text as string,
       score: r.score,
-      syncedAt: r.item.metadata.syncedAt,
+      syncedAt: r.payload!.syncedAt as string,
     }));
   }
 
-  async stats(): Promise<{ chunkCount: number; fileCount: number; lastSyncAt: string | null }> {
-    const items = await this.index.listItems<ChunkMeta>();
-    const fileSet = new Set(items.map(i => i.metadata.filePath));
-    const syncedAts = items.map(i => i.metadata.syncedAt).filter(Boolean).sort();
+  async stats(): Promise<{
+    chunkCount: number;
+    fileCount: number;
+    lastSyncAt: string | null;
+  }> {
+    const { count } = await this.client.count(this.collection);
+    if (count === 0) {
+      return { chunkCount: 0, fileCount: 0, lastSyncAt: null };
+    }
+
+    const { points } = await this.client.scroll(this.collection, {
+      limit: 10000,
+      with_payload: ["filePath", "syncedAt"],
+    });
+
+    const fileSet = new Set(points.map((p) => p.payload?.filePath as string));
+    const syncedAts = points
+      .map((p) => p.payload?.syncedAt as string)
+      .filter(Boolean)
+      .sort();
+
     return {
-      chunkCount: items.length,
+      chunkCount: count,
       fileCount: fileSet.size,
       lastSyncAt: syncedAts.at(-1) ?? null,
     };

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: mcp-practical
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: TRANSPORT
+        value: http
+      - key: PORT
+        value: "10000"
+      - key: MCP_API_TOKEN
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: QDRANT_URL
+        sync: false
+      - key: QDRANT_API_KEY
+        sync: false
+      - key: QDRANT_COLLECTION
+        value: dd-brain-book
+      - key: GOOGLE_AI_API_KEY
+        sync: false
+      - key: BITBUCKET_EMAIL
+        sync: false
+      - key: BITBUCKET_API_TOKEN
+        sync: false
+      - key: BITBUCKET_WORKSPACE
+        sync: false
+      - key: BITBUCKET_REPO
+        sync: false
+      - key: BITBUCKET_BRANCH
+        value: main
+      - key: KB_CHUNK_MAX_CHARS
+        value: "1500"
+      - key: KB_SEARCH_TOP_K
+        value: "5"

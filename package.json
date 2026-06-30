@@ -14,6 +14,7 @@
   "dependencies": {
     "@google/genai": "^2.9.0",
     "@modelcontextprotocol/sdk": "^1.12.0",
+    "@qdrant/js-client-rest": "^1.18.0",
     "dotenv": "^17.4.2",
     "vectra": "^0.15.0",
     "zod": "^3.23.8"

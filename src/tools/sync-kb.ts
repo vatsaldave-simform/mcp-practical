@@ -20,7 +20,7 @@ export function register(server: McpServer): void {
       const cfg = getConfig();
       const client = new BitbucketClient(cfg.bitbucket);
       const embedder = new Embedder(cfg.google.apiKey);
-      const store = new VectorStore(cfg.index.dir);
+      const store = new VectorStore(cfg.qdrant.url, cfg.qdrant.apiKey, cfg.qdrant.collection);
 
       await store.init();
 
@@ -37,7 +37,7 @@ export function register(server: McpServer): void {
           const chunks = chunkMarkdown(
             content,
             filePath,
-            cfg.index.chunkMaxChars,
+            cfg.search.chunkMaxChars,
           );
 
           if (chunks.length === 0) {

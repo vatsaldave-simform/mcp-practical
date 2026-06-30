@@ -8,7 +8,7 @@ export function register(server: McpServer): void {
     'kb://status',
     async (uri) => {
       const cfg = getConfig();
-      const store = new VectorStore(cfg.index.dir);
+      const store = new VectorStore(cfg.qdrant.url, cfg.qdrant.apiKey, cfg.qdrant.collection);
       await store.init();
 
       const { chunkCount, fileCount, lastSyncAt } = await store.stats();

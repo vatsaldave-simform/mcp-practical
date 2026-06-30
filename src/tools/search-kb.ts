@@ -16,7 +16,7 @@ export function register(server: McpServer): void {
     async (args) => {
       const cfg = getConfig();
       const embedder = new Embedder(cfg.google.apiKey);
-      const store = new VectorStore(cfg.index.dir);
+      const store = new VectorStore(cfg.qdrant.url, cfg.qdrant.apiKey, cfg.qdrant.collection);
 
       await store.init();
 
@@ -28,7 +28,7 @@ export function register(server: McpServer): void {
       }
 
       const [queryVector] = await embedder.embedBatch([args.query]);
-      const results = await store.query(queryVector, args.topK ?? cfg.index.searchTopK, args.filePath);
+      const results = await store.query(queryVector, args.topK ?? cfg.search.topK, args.filePath);
 
       if (results.length === 0) {
         return {
